@@ -599,6 +599,21 @@
     buzz([30, 60, 30, 60, 80]);
   }
 
+  // In-app confirm dialog (some browsers and embedded views block window.confirm).
+  let pendingAsk = null;
+  function ask(message, okLabel, onYes) {
+    pendingAsk = onYes;
+    const m = document.createElement('div');
+    m.className = 'modal';
+    m.innerHTML = `<div class="modal-card ask" role="alertdialog" aria-modal="true">
+      <p>${esc(message)}</p>
+      <div class="row">
+        <button class="btn ghost grow" data-a="close-modal">Cancel</button>
+        <button class="btn danger-fill grow" data-a="ask-yes">${esc(okLabel)}</button>
+      </div></div>`;
+    document.body.append(m);
+  }
+
   function commit() {
     save();
     const before = R;
@@ -677,10 +692,11 @@
     },
     'habit-del': v => {
       const h = S.habits[Number(v)];
-      if (h && confirm(`Remove "${h.name}"? XP already earned from it will be removed too.`)) {
-        S.habits.splice(Number(v), 1);
+      if (!h) return;
+      ask(`Remove "${h.name}"? XP earned from it will be removed too.`, 'Remove', () => {
+        S.habits.splice(S.habits.indexOf(h), 1);
         commit();
-      }
+      });
     },
     export: () => {
       const blob = new Blob([JSON.stringify(S, null, 2)], { type: 'application/json' });
@@ -692,10 +708,11 @@
     },
     import: () => $('#import-file').click(),
     reset: () => {
-      if (!confirm('Delete all your progress, XP and badges? This cannot be undone.')) return;
-      try { localStorage.removeItem(STORE); } catch (e) { /* ignore */ }
-      S = defaults(); VIEW = today(); TAB = 'today';
-      R = compute(); applyTheme(); render();
+      ask('Delete all your progress, XP and badges? This cannot be undone.', 'Delete everything', () => {
+        try { localStorage.removeItem(STORE); } catch (e) { /* ignore */ }
+        S = defaults(); VIEW = today(); TAB = 'today';
+        R = compute(); applyTheme(); render();
+      });
     },
     onboard: () => {
       const st = S.settings;
@@ -710,6 +727,11 @@
       toast(`<span class="ti">⚡</span><div><small>Day 1</small><b>Your reset starts now</b></div>`, 'gold');
     },
     'close-modal': (v, el) => el.closest('.modal').remove(),
+    'ask-yes': (v, el) => {
+      el.closest('.modal').remove();
+      const fn = pendingAsk; pendingAsk = null;
+      if (fn) fn();
+    },
   };
 
   document.addEventListener('click', e => {
@@ -736,12 +758,13 @@
       try {
         const data = JSON.parse(reader.result);
         if (!data || typeof data.days !== 'object') throw new Error('bad file');
-        if (!confirm('Replace your current progress with this backup?')) return;
-        S = normalise(data);
-        VIEW = today();
-        applyTheme();
-        commit();
-        toast('Backup imported');
+        ask('Replace your current progress with this backup?', 'Replace', () => {
+          S = normalise(data);
+          VIEW = today();
+          applyTheme();
+          commit();
+          toast('Backup imported');
+        });
       } catch (err) {
         toast("That file doesn't look like a Life Quest backup.");
       }

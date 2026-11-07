@@ -381,3 +381,5 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1p
   .tiles { grid-template-columns: repeat(4, 1fr); }
 }
 .chart.pu .b i { min-height: 0; }
+.ask p { margin: 0 0 6px; font-size: 16px; }
+.btn.danger-fill { background: var(--danger); color: #fff; }
