@@ -1,6 +1,6 @@
 # Life Quest ⚡
 
-A gamified life reset app. Earn XP for daily water, steps and push-ups, and for hitting your weekly workout goal. Level up, keep streaks alive and unlock badges.
+A gamified life reset app. Earn XP for daily water, protein, steps and push-ups, and for hitting your weekly workout goal. Level up, keep streaks alive and unlock badges.
 
 It's a web app you can install to your phone's home screen. It works offline and keeps all data on your device. There's no account and no server.
 
@@ -9,12 +9,13 @@ It's a web app you can install to your phone's home screen. It works offline and
 | Quest | How XP works |
 |---|---|
 | 💧 Water | 5 XP per 250 ml, +50 for your daily goal |
+| 🍗 Protein | 5 XP per 10 g, +50 for your goal (body weight × 2 g/kg by default). One-tap foods or enter grams |
 | 👟 Steps | 10 XP per 1,000 steps, +50 for your daily goal |
 | 💪 Push-ups | 1 XP per rep, +50 for beating today's target, +100 for a new best |
-| 🏋️ Workouts | 75 XP each (2/day max), +250 for your weekly goal, +50 per week in a row |
-| ✅ Habits | 15 XP each (customisable: sleep, veg, no junk…) |
+| 🏋️ Workouts | Strength, cardio, HIIT, stretching, yoga, swim, sport or walk: 75 XP each (2/day max), +250 for your weekly goal, +50 per week in a row |
+| ✅ Habits | 15 XP each (customisable: sleep, veg, no junk, message a friend…) |
 | ⭐ Perfect day | Water + steps + push-ups all done: +100, +10 per day in a row (max +200) |
-| 🏅 Badges | 22 milestones with one-off XP bonuses |
+| 🏅 Badges | 24 milestones with one-off XP bonuses |
 
 **Progressive overload:** push-ups have a daily target. Beat it and the next target goes up (by 2 reps by default). Miss two sessions in a row and it eases back. The app also suggests a sets × reps split.
 

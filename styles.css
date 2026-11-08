@@ -18,6 +18,7 @@
   --push: #e2474f;
   --work: #ee8a00;
   --habit: #8e4fd6;
+  --protein: #c93a7c;
   --shadow: 0 1px 2px rgba(23, 20, 43, .05), 0 6px 20px rgba(23, 20, 43, .06);
   --radius: 18px;
   color-scheme: light;
@@ -42,6 +43,8 @@
     --push: #ff6b72;
     --work: #ffa733;
     --habit: #b98bff;
+  --protein: #ff7ab8;
+    --protein: #ff7ab8;
     --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .25);
     color-scheme: dark;
   }
@@ -153,6 +156,7 @@ button { cursor: pointer; }
 .quest.push { --c: var(--push); }
 .quest.work { --c: var(--work); }
 .quest.habits { --c: var(--habit); }
+.quest.protein { --c: var(--protein); }
 .quest header { display: flex; align-items: center; gap: 12px; }
 .q-icon {
   width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; font-size: 22px; flex: none;
@@ -220,9 +224,10 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1p
 .wd.cur i { outline: 2px solid var(--work); outline-offset: 1px; }
 .wd.future i { opacity: .45; }
 .wd small { font-size: 11px; color: var(--muted); }
-.wo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
+.wo-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px; }
 .wo {
-  border: 1px solid var(--line); background: var(--surface-2); border-radius: 14px; padding: 10px 4px;
+  border: 1px solid var(--line); background: var(--surface-2); border-radius: 14px; padding: 10px 2px;
+  min-width: 0; text-align: center; line-height: 1.2;
   display: grid; justify-items: center; gap: 2px; font-size: 12px; font-weight: 600;
 }
 .wo span { font-size: 22px; }
@@ -383,3 +388,14 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1p
 .chart.pu .b i { min-height: 0; }
 .ask p { margin: 0 0 6px; font-size: 16px; }
 .btn.danger-fill { background: var(--danger); color: #fff; }
+
+.foods { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
+.food {
+  border: 1px solid var(--line); background: var(--surface-2); border-radius: 14px; padding: 8px 4px;
+  display: grid; justify-items: center; gap: 1px; min-width: 0;
+}
+.food span { font-size: 20px; }
+.food b { font-size: 13px; color: var(--protein); font-variant-numeric: tabular-nums; }
+.food small { font-size: 11px; color: var(--muted); }
+.food:active { transform: scale(.96); }
+.quest.protein .set { background: color-mix(in srgb, var(--protein) 14%, transparent); color: var(--protein); }

@@ -19,7 +19,9 @@
     { id: 'strength', icon: '🏋️', name: 'Strength' },
     { id: 'cardio', icon: '🏃', name: 'Cardio' },
     { id: 'hiit', icon: '⚡', name: 'HIIT' },
-    { id: 'mobility', icon: '🧘', name: 'Mobility' },
+    { id: 'stretch', icon: '🤸', name: 'Stretching' },
+    { id: 'mobility', icon: '🧘', name: 'Yoga' },
+    { id: 'swim', icon: '🏊', name: 'Swim' },
     { id: 'sport', icon: '⚽', name: 'Sport' },
     { id: 'walk', icon: '🥾', name: 'Hike / walk' },
   ];
@@ -29,6 +31,17 @@
     { id: 'h_veg', icon: '🥦', name: '5 portions of fruit & veg' },
     { id: 'h_clean', icon: '🚫', name: 'No junk food or alcohol' },
     { id: 'h_mind', icon: '🧠', name: '10 min reading or meditation' },
+    { id: 'h_social', icon: '💬', name: 'Message a friend or family member' },
+  ];
+
+  // Rough protein per serving, for one-tap logging.
+  const FOODS = [
+    { icon: '🥚', name: '2 eggs', g: 12 },
+    { icon: '🍗', name: 'Chicken breast', g: 40 },
+    { icon: '🥤', name: 'Protein shake', g: 25 },
+    { icon: '🐟', name: 'Tin of tuna', g: 25 },
+    { icon: '🥣', name: 'Greek yogurt', g: 15 },
+    { icon: '🥛', name: 'Glass of milk', g: 8 },
   ];
 
   // Badges. `t` gets the running counters after each day.
@@ -41,6 +54,8 @@
     { id: 'stp7', icon: '🗺️', name: 'Explorer', desc: '7-day step streak', xp: 200, t: c => c.ss >= 7 },
     { id: 'stp250k', icon: '🏃', name: 'Marathoner', desc: '250,000 lifetime steps', xp: 300, t: c => c.lifeSteps >= 250000 },
     { id: 'stp1m', icon: '🌍', name: 'Globetrotter', desc: '1,000,000 lifetime steps', xp: 1000, t: c => c.lifeSteps >= 1e6 },
+    { id: 'pro1', icon: '🍗', name: 'Fuelled Up', desc: 'Hit your protein goal', xp: 50, t: c => c.proGoals >= 1 },
+    { id: 'pro7', icon: '🥩', name: 'Built Different', desc: '7-day protein streak', xp: 250, t: c => c.spro >= 7 },
     { id: 'pu50', icon: '💪', name: 'Half Century', desc: '50 push-ups in one day', xp: 100, t: c => c.maxPush >= 50 },
     { id: 'pu100', icon: '🦾', name: 'Centurion', desc: '100 push-ups in one day', xp: 300, t: c => c.maxPush >= 100 },
     { id: 'pu1k', icon: '🪨', name: 'Rock Solid', desc: '1,000 lifetime push-ups', xp: 300, t: c => c.lifePush >= 1000 },
@@ -72,6 +87,8 @@
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const pct = (v, g) => (g > 0 ? clamp((v / g) * 100, 0, 100) : 0);
   const int = (v, min, max, fallback) => { const n = parseInt(v, 10); return Number.isFinite(n) ? clamp(n, min, max) : fallback; };
+  const flt = (v, min, max, fallback) => { const n = parseFloat(v); return Number.isFinite(n) ? clamp(Math.round(n * 10) / 10, min, max) : fallback; };
+  const proteinGoal = st => (st.bodyWeight > 0 ? Math.round(st.bodyWeight * st.proteinPerKg) : 0);
   const buzz = ms => { try { navigator.vibrate && navigator.vibrate(ms); } catch (e) { /* not supported */ } };
 
   const need = L => Math.round(120 * Math.pow(L, 1.5)); // XP to go from level L to L+1
@@ -85,8 +102,9 @@
   /* ---------- state ---------- */
   function defaults() {
     return {
-      settings: { name: '', waterGoal: 2500, glass: 250, stepsGoal: 10000, weeklyGoal: 4, pushStart: 20, pushInc: 2, theme: 'auto' },
+      settings: { name: '', waterGoal: 2500, glass: 250, stepsGoal: 10000, weeklyGoal: 4, pushStart: 20, pushInc: 2, theme: 'auto', bodyWeight: 0, proteinPerKg: 2 },
       habits: DEFAULT_HABITS.map(h => ({ ...h })),
+      habitsOffered: DEFAULT_HABITS.map(h => h.id),
       days: {},
       seenAch: {},
       level: 1,
@@ -105,13 +123,19 @@
     const d = defaults();
     const out = { ...d, ...s, settings: { ...d.settings, ...(s.settings || {}) } };
     if (!Array.isArray(out.habits)) out.habits = d.habits;
+    // Give existing players any new default habits once (they can still delete them).
+    const offered = new Set(s.habitsOffered || ['h_sleep', 'h_veg', 'h_clean', 'h_mind']);
+    for (const h of DEFAULT_HABITS) {
+      if (!offered.has(h.id) && !out.habits.some(x => x.id === h.id)) out.habits.push({ ...h });
+    }
+    out.habitsOffered = DEFAULT_HABITS.map(h => h.id);
     for (const k of Object.keys(out.days)) out.days[k] = { ...blankDay(out.settings), ...out.days[k] };
     return out;
   }
   function save() {
     try { localStorage.setItem(STORE, JSON.stringify(S)); } catch (e) { /* storage unavailable */ }
   }
-  const blankDay = st => ({ water: 0, steps: 0, push: [], workouts: [], habits: {}, wg: st.waterGoal, sg: st.stepsGoal });
+  const blankDay = st => ({ water: 0, steps: 0, protein: [], push: [], workouts: [], habits: {}, wg: st.waterGoal, sg: st.stepsGoal, pg: proteinGoal(st) });
   const peek = k => S.days[k] || blankDay(S.settings);
   const day = k => (S.days[k] ||= blankDay(S.settings));
 
@@ -124,10 +148,10 @@
 
     const R = { days: {}, weeks: {}, ach: {}, total: 0 };
     const c = {
-      any: false, waterGoals: 0, stepGoals: 0, sw: 0, ss: 0, sp: 0, spf: 0,
+      any: false, waterGoals: 0, stepGoals: 0, proGoals: 0, sw: 0, ss: 0, sp: 0, spf: 0, spro: 0, lifeProtein: 0,
       lifeSteps: 0, lifeWater: 0, lifePush: 0, maxPush: 0, prCount: 0, workouts: 0,
       weeksDone: 0, weekStreak: 0, perfectDays: 0, allHabits: 0,
-      best: { sw: 0, ss: 0, sp: 0, spf: 0, week: 0 },
+      best: { sw: 0, ss: 0, sp: 0, spf: 0, spro: 0, week: 0 },
     };
     const inc = Math.max(1, st.pushInc | 0);
     let target = Math.max(1, st.pushStart | 0), miss = 0, pr = 0;
@@ -151,6 +175,9 @@
       if (wMet) add('Water goal', 50);
       add('Steps', Math.min(Math.floor(d.steps / 1000), Math.floor(sg / 1000) * 2) * 10);
       if (sMet) add('Step goal', 50);
+      const pg = d.pg || proteinGoal(st), prot = sum(d.protein.map(x => x.g)), proMet = pg > 0 && prot >= pg;
+      add('Protein', Math.min(Math.floor(prot / 10), pg ? Math.ceil((pg * 1.5) / 10) : 15) * 5);
+      if (proMet) add('Protein goal', 50);
       add('Push-up reps', Math.min(pt, 300));
       if (pMet) add('Push-up target', 50);
       let isPR = false;
@@ -163,6 +190,7 @@
       c.sw = wMet ? c.sw + 1 : 0;
       c.ss = sMet ? c.ss + 1 : 0;
       c.sp = pMet ? c.sp + 1 : 0;
+      c.spro = proMet ? c.spro + 1 : 0;
       const perfect = wMet && sMet && pMet;
       c.spf = perfect ? c.spf + 1 : 0;
       if (perfect) {
@@ -179,16 +207,18 @@
 
       if (wMet) c.waterGoals++;
       if (sMet) c.stepGoals++;
+      if (proMet) c.proGoals++;
+      c.lifeProtein += prot;
       c.lifeSteps += d.steps; c.lifeWater += d.water; c.lifePush += pt; c.workouts += nW;
       c.maxPush = Math.max(c.maxPush, pt);
       if (S.habits.length && hDone === S.habits.length) c.allHabits++;
-      if (d.water || d.steps || pt || nW || hDone) c.any = true;
-      for (const s of ['sw', 'ss', 'sp', 'spf']) c.best[s] = Math.max(c.best[s], c[s]);
+      if (d.water || d.steps || prot || pt || nW || hDone) c.any = true;
+      for (const s of ['sw', 'ss', 'sp', 'spf', 'spro']) c.best[s] = Math.max(c.best[s], c[s]);
       c.best.week = Math.max(c.best.week, c.weekStreak);
 
       for (const a of ACH) if (!R.ach[a.id] && a.t(c)) { R.ach[a.id] = k; add(`Badge: ${a.name}`, a.xp); }
 
-      R.days[k] = { xp, bd, target: tgt, pt, wMet, sMet, pMet, perfect, wg, sg, isPR, hDone, sw: c.sw, ss: c.ss, sp: c.sp, spf: c.spf };
+      R.days[k] = { xp, bd, target: tgt, pt, wMet, sMet, pMet, perfect, wg, sg, pg, prot, proMet, isPR, hDone, sw: c.sw, ss: c.ss, sp: c.sp, spf: c.spf, spro: c.spro };
       R.total += xp;
 
       // Progressive overload: hit the target and it goes up; miss two sessions in a row and it eases off.
@@ -287,6 +317,30 @@
         <button class="btn soft" data-a="water" data-v="500">+500</button>
       </div>
       <footer>5 XP per 250 ml · +50 XP for the goal</footer>
+    </section>
+
+    <section class="card quest protein ${r.proMet ? 'done' : ''}">
+      <header>
+        <div class="q-icon">🍗</div>
+        <div class="q-title"><h2>Protein</h2><p>${r.pg ? `${fmt(r.prot)} / ${fmt(r.pg)} g` : `${fmt(r.prot)} g today`}</p></div>
+        ${streakChip(live('spro', 'proMet'), 'Protein streak')}
+      </header>
+      ${r.pg ? `<div class="bar"><i style="width:${pct(r.prot, r.pg)}%"></i></div>` : `
+      <p class="hint">Enter your body weight to get a daily goal of ${st.proteinPerKg} g of protein per kg.</p>
+      <div class="row">
+        <span class="inp grow"><input id="weight" type="number" inputmode="decimal" min="30" max="300" step="0.5" placeholder="Body weight" aria-label="Body weight in kg"><em>kg</em></span>
+        <button class="btn" data-a="weight-set">Set goal</button>
+      </div>`}
+      <div class="foods">
+        ${FOODS.map((f, i) => `<button class="food" data-a="pro-food" data-v="${i}"><span>${f.icon}</span><b>+${f.g} g</b><small>${f.name}</small></button>`).join('')}
+      </div>
+      <div class="row">
+        <input id="pro-g" class="grow" type="number" inputmode="numeric" min="1" placeholder="Grams of protein" aria-label="Grams of protein">
+        <button class="btn" data-a="pro-add">Add</button>
+      </div>
+      ${d.protein.length ? `<div class="sets">${d.protein.map((x, i) =>
+        `<button class="set" data-a="pro-del" data-v="${i}" aria-label="Remove ${x.g} g">${x.icon || ''} ${x.g} g<span>×</span></button>`).join('')}</div>` : ''}
+      <footer>5 XP per 10 g · +50 XP for the goal${r.pg ? ` (${st.proteinPerKg} g per kg × ${st.bodyWeight} kg)` : ''}. Food amounts are rough guides.</footer>
     </section>
 
     <section class="card quest steps ${r.sMet ? 'done' : ''}">
@@ -420,7 +474,7 @@
         ${tile('Lifetime steps', fmt(c.lifeSteps), `best streak ${c.best.ss}`)}
         ${tile('Water drunk', `${(c.lifeWater / 1000).toFixed(1)} L`, `best streak ${c.best.sw}`)}
         ${tile('Workouts', fmt(c.workouts), `${c.weeksDone} goal weeks`)}
-        ${tile('Badges', `${Object.keys(R.ach).length}/${ACH.length}`)}
+        ${tile('Protein eaten', `${(c.lifeProtein / 1000).toFixed(1)} kg`, `best streak ${c.best.spro}`)}
       </div>
     </section>
 
@@ -477,13 +531,15 @@
       ${num('s-water', 'Daily water goal', st.waterGoal, 500, 6000, 250, 'ml')}
       ${num('s-glass', 'Glass size', st.glass, 100, 1000, 50, 'ml')}
       ${num('s-steps', 'Daily step goal', st.stepsGoal, 1000, 50000, 500, 'steps')}
+      ${num('s-weight', 'Body weight', st.bodyWeight || '', 30, 300, 0.5, 'kg')}
+      ${num('s-ppk', 'Protein per kg of body weight', st.proteinPerKg, 1, 3.5, 0.1, 'g / kg')}
       ${num('s-week', 'Workouts per week', st.weeklyGoal, 1, 14, 1, '/ week')}
       ${num('s-pstart', 'Push-up starting target', st.pushStart, 1, 500, 1, 'reps')}
       ${num('s-pinc', 'Add this many after each win', st.pushInc, 1, 20, 1, 'reps')}
       <label class="field"><span>Theme</span><span class="inp">
         <select id="s-theme">${[['auto', 'Match phone'], ['light', 'Light'], ['dark', 'Dark']].map(([v, l]) => `<option value="${v}" ${st.theme === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
       </span></label>
-      <p class="muted small">Changing the push-up numbers recalculates your target history. Water and step goals apply from today.</p>
+      <p class="muted small">Changing the push-up numbers recalculates your target history. Water, step and protein goals apply from today.</p>
       <button class="btn wide" data-a="save-settings">Save settings</button>
     </section>
 
@@ -504,8 +560,9 @@
       <ul class="rules">
         <li><b>Water:</b> 5 XP per 250 ml, +50 for hitting your goal.</li>
         <li><b>Steps:</b> 10 XP per 1,000 steps, +50 for your goal.</li>
+        <li><b>Protein:</b> 5 XP per 10 g, +50 for your goal (body weight × grams per kg, 2 by default).</li>
         <li><b>Push-ups:</b> 1 XP per rep, +50 for beating the target, +100 for a new best. Beat the target and it goes up by your step size next time. Miss it twice in a row and it eases back.</li>
-        <li><b>Workouts:</b> 75 XP each (2 a day max). Hit your weekly goal for +250, plus +50 for each week in a row.</li>
+        <li><b>Workouts:</b> any activity, stretching included, gives 75 XP each (2 a day max). Hit your weekly goal for +250, plus +50 for each week in a row.</li>
         <li><b>Habits:</b> 15 XP each.</li>
         <li><b>Perfect day:</b> water, steps and push-ups all done gives +100, plus +10 per day in a row (up to +200).</li>
         <li><b>Badges:</b> one-off XP bonuses for milestones.</li>
@@ -535,6 +592,7 @@
         <p class="muted">Earn XP for the basics: water, steps, push-ups and workouts. Level up, keep your streaks alive and unlock badges.</p>
         <label class="field"><span>What should we call you?</span><span class="inp"><input id="o-name" type="text" maxlength="24" placeholder="Hero"></span></label>
         <label class="field"><span>Push-ups you can do comfortably today</span><span class="inp"><input id="o-push" type="number" inputmode="numeric" min="1" max="500" value="${st.pushStart}"><em>reps</em></span></label>
+        <label class="field"><span>Body weight (sets your protein goal)</span><span class="inp"><input id="o-weight" type="number" inputmode="decimal" min="30" max="300" step="0.5" placeholder="e.g. 80"><em>kg</em></span></label>
         <label class="field"><span>Daily step goal</span><span class="inp"><input id="o-steps" type="number" inputmode="numeric" min="1000" max="50000" step="500" value="${st.stepsGoal}"><em>steps</em></span></label>
         <label class="field"><span>Workouts per week</span><span class="inp"><input id="o-week" type="number" inputmode="numeric" min="1" max="14" value="${st.weeklyGoal}"><em>/ week</em></span></label>
         <button class="btn wide big" data-a="onboard">Begin Day 1</button>
@@ -651,6 +709,25 @@
       mut(d => { d.steps = x; });
     },
     'steps-add': v => mut(d => { d.steps = clamp(d.steps + Number(v), 0, 200000); }),
+    'pro-food': v => {
+      const f = FOODS[Number(v)];
+      if (f) mut(d => { d.protein.push({ g: f.g, icon: f.icon }); });
+    },
+    'pro-add': () => {
+      const g = int($('#pro-g').value, 1, 300, NaN);
+      if (Number.isNaN(g)) return;
+      mut(d => { d.protein.push({ g }); });
+    },
+    'pro-del': v => mut(d => { d.protein.splice(Number(v), 1); }),
+    'weight-set': () => {
+      const w = flt($('#weight').value, 30, 300, NaN);
+      if (Number.isNaN(w)) return;
+      S.settings.bodyWeight = w;
+      const g = proteinGoal(S.settings);
+      for (const k of [today(), VIEW]) if (S.days[k]) S.days[k].pg = g;
+      commit();
+      toast(`Protein goal set: <b>${g} g</b> a day`);
+    },
     'push-add': () => {
       const x = int($('#reps').value, 1, 1000, NaN);
       if (Number.isNaN(x)) return;
@@ -674,11 +751,13 @@
       st.glass = int($('#s-glass').value, 100, 1000, st.glass);
       st.stepsGoal = int($('#s-steps').value, 1000, 50000, st.stepsGoal);
       st.weeklyGoal = int($('#s-week').value, 1, 14, st.weeklyGoal);
+      st.bodyWeight = $('#s-weight').value === '' ? 0 : flt($('#s-weight').value, 30, 300, st.bodyWeight);
+      st.proteinPerKg = flt($('#s-ppk').value, 1, 3.5, st.proteinPerKg);
       st.pushStart = int($('#s-pstart').value, 1, 500, st.pushStart);
       st.pushInc = int($('#s-pinc').value, 1, 20, st.pushInc);
       st.theme = $('#s-theme').value;
       const t = S.days[today()];
-      if (t) { t.wg = st.waterGoal; t.sg = st.stepsGoal; }
+      if (t) { t.wg = st.waterGoal; t.sg = st.stepsGoal; t.pg = proteinGoal(st); }
       applyTheme();
       commit();
       toast('Settings saved');
@@ -720,6 +799,9 @@
       st.pushStart = int($('#o-push').value, 1, 500, st.pushStart);
       st.stepsGoal = int($('#o-steps').value, 1000, 50000, st.stepsGoal);
       st.weeklyGoal = int($('#o-week').value, 1, 14, st.weeklyGoal);
+      st.bodyWeight = flt($('#o-weight').value, 30, 300, 0);
+      const t = S.days[today()];
+      if (t) t.pg = proteinGoal(st);
       S.onboarded = true;
       S.start = today();
       document.querySelector('.modal.ob')?.remove();
@@ -746,7 +828,7 @@
   // Enter key in the number boxes saves them.
   document.addEventListener('keydown', e => {
     if (e.key !== 'Enter') return;
-    const map = { steps: 'steps-set', reps: 'push-add', 'h-name': 'habit-add' };
+    const map = { steps: 'steps-set', reps: 'push-add', 'h-name': 'habit-add', 'pro-g': 'pro-add', weight: 'weight-set' };
     const a = map[e.target.id];
     if (a) { e.preventDefault(); ACT[a](); }
   });
