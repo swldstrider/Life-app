@@ -9,6 +9,8 @@
 (() => {
   const STORE = 'lifequest:v1';
   const WATER_UNIT = 250; // ml per 5 XP
+  const FREEZE_CAP = 3; // most streak freezes you can bank
+  const FREEZE_EVERY = 7; // earn a freeze every 7 streak days
 
   const RANKS = [
     [1, 'Rookie'], [3, 'Initiate'], [5, 'Contender'], [8, 'Warrior'], [12, 'Champion'],
@@ -65,6 +67,12 @@
     { id: 'wk1', icon: '📅', name: 'On Schedule', desc: 'Hit your weekly workout goal', xp: 150, t: c => c.weeksDone >= 1 },
     { id: 'wk4', icon: '🔥', name: 'Unstoppable', desc: '4 weeks in a row on goal', xp: 600, t: c => c.weekStreak >= 4 },
     { id: 'wo50', icon: '🏅', name: 'Iron Regular', desc: '50 workouts logged', xp: 750, t: c => c.workouts >= 50 },
+    { id: 'ds3', icon: '✨', name: 'Spark', desc: '3-day daily streak', xp: 50, t: c => c.ds >= 3 },
+    { id: 'ds7', icon: '🔥', name: 'On Fire', desc: '7-day daily streak', xp: 150, t: c => c.ds >= 7 },
+    { id: 'ds30', icon: '☄️', name: 'Blazing', desc: '30-day daily streak', xp: 600, t: c => c.ds >= 30 },
+    { id: 'ds100', icon: '🌋', name: 'Eternal Flame', desc: '100-day daily streak', xp: 2500, t: c => c.ds >= 100 },
+    { id: 'ds365', icon: '☀️', name: 'Year of You', desc: '365-day daily streak', xp: 10000, t: c => c.ds >= 365 },
+    { id: 'frz1', icon: '🧊', name: 'Saved by the Ice', desc: 'A streak freeze saved your streak', xp: 50, t: c => c.frzUsed >= 1 },
     { id: 'pf1', icon: '⭐', name: 'Perfect Day', desc: 'Water, steps & push-ups in one day', xp: 100, t: c => c.perfectDays >= 1 },
     { id: 'pf7', icon: '🌟', name: 'Perfect Week', desc: '7-day perfect streak', xp: 500, t: c => c.spf >= 7 },
     { id: 'pf30', icon: '👑', name: 'Reset Complete', desc: '30-day perfect streak', xp: 2000, t: c => c.spf >= 30 },
@@ -151,10 +159,12 @@
       any: false, waterGoals: 0, stepGoals: 0, proGoals: 0, sw: 0, ss: 0, sp: 0, spf: 0, spro: 0, lifeProtein: 0,
       lifeSteps: 0, lifeWater: 0, lifePush: 0, maxPush: 0, prCount: 0, workouts: 0,
       weeksDone: 0, weekStreak: 0, perfectDays: 0, allHabits: 0,
-      best: { sw: 0, ss: 0, sp: 0, spf: 0, spro: 0, week: 0 },
+      best: { sw: 0, ss: 0, sp: 0, spf: 0, spro: 0, week: 0, ds: 0 },
+      ds: 0, frzUsed: 0,
     };
     const inc = Math.max(1, st.pushInc | 0);
     let target = Math.max(1, st.pushStart | 0), miss = 0, pr = 0;
+    let ds = 0, frz = 0, frzEarned = 0, frzUsed = 0;
     let wk = null, wCount = 0, wDone = false, streakBefore = 0;
 
     for (; k <= T; k = addDays(k, 1)) {
@@ -191,6 +201,22 @@
       c.ss = sMet ? c.ss + 1 : 0;
       c.sp = pMet ? c.sp + 1 : 0;
       c.spro = proMet ? c.spro + 1 : 0;
+
+      // Daily streak: hit any daily goal or log a workout. Every 7th day banks a streak freeze,
+      // which is spent automatically to cover a missed day. Today only counts once it's done.
+      const active = wMet || sMet || pMet || proMet || nW > 0;
+      let frozen = false, earned = false;
+      if (active) {
+        ds++;
+        if (ds % FREEZE_EVERY === 0) {
+          if (frz < FREEZE_CAP) { frz++; frzEarned++; earned = true; }
+          else add('Streak freeze (bank full)', 100);
+        }
+      } else if (k < T) {
+        if (ds > 0 && frz > 0) { frz--; frzUsed++; frozen = true; } else ds = 0;
+      }
+      c.ds = ds; c.frzUsed = frzUsed;
+      c.best.ds = Math.max(c.best.ds, ds);
       const perfect = wMet && sMet && pMet;
       c.spf = perfect ? c.spf + 1 : 0;
       if (perfect) {
@@ -218,7 +244,7 @@
 
       for (const a of ACH) if (!R.ach[a.id] && a.t(c)) { R.ach[a.id] = k; add(`Badge: ${a.name}`, a.xp); }
 
-      R.days[k] = { xp, bd, target: tgt, pt, wMet, sMet, pMet, perfect, wg, sg, pg, prot, proMet, isPR, hDone, sw: c.sw, ss: c.ss, sp: c.sp, spf: c.spf, spro: c.spro };
+      R.days[k] = { xp, bd, target: tgt, pt, wMet, sMet, pMet, perfect, wg, sg, pg, prot, proMet, isPR, hDone, sw: c.sw, ss: c.ss, sp: c.sp, spf: c.spf, spro: c.spro, ds, frz, active, frozen, earned };
       R.total += xp;
 
       // Progressive overload: hit the target and it goes up; miss two sessions in a row and it eases off.
@@ -226,6 +252,7 @@
       else if (pt > 0 && ++miss >= 2) { target = Math.max(5, tgt - inc); miss = 0; }
     }
     R.c = c; R.pr = pr; R.lv = levelInfo(R.total);
+    R.frz = frz; R.frzEarned = frzEarned; R.frzUsed = frzUsed;
     return R;
   }
 
@@ -252,6 +279,42 @@
 
   function streakChip(n, label) {
     return `<span class="streak ${n ? 'hot' : ''}" title="${label}">🔥 ${n}</span>`;
+  }
+
+  function vStreak() {
+    const T = today(), r = R.days[T], ds = r.ds, frz = r.frz;
+    const toNext = FREEZE_EVERY - (ds % FREEZE_EVERY);
+    const slots = Array.from({ length: FREEZE_CAP }, (_, i) =>
+      `<span class="frz ${i < frz ? 'on' : ''}" aria-hidden="true">🧊</span>`).join('');
+    const days = Array.from({ length: 7 }, (_, i) => {
+      const k = addDays(T, i - 6), x = R.days[k];
+      const letter = parse(k).toLocaleDateString(undefined, { weekday: 'narrow' });
+      const cls = !x ? '' : x.active ? 'on' : x.frozen ? 'ice' : k === T ? 'pending' : 'off';
+      const icon = x?.active ? '🔥' : x?.frozen ? '🧊' : '';
+      return `<div class="sd ${cls}"><i>${icon}</i><small>${letter}</small></div>`;
+    }).join('');
+    const status = r.active
+      ? `Today counts. Come back tomorrow for day ${ds + 1}.`
+      : ds
+        ? `Hit any daily goal or log a workout to make it <b>${ds + 1} days</b>.`
+        : 'Hit any daily goal or log a workout to start your streak.';
+    const next = frz >= FREEZE_CAP
+      ? `Freeze bank full. Every ${FREEZE_EVERY}th day gives +100 XP instead.`
+      : `${toNext} more day${toNext === 1 ? '' : 's'} to earn a freeze`;
+    return `
+    <section class="card streakcard ${r.active ? 'lit' : ''}">
+      <div class="sc-top">
+        <div class="flame"><span>🔥</span><div><b>${ds}</b><small>day streak</small></div></div>
+        <div class="sc-side">
+          <small>Streak freezes</small>
+          <div class="frzs" aria-label="${frz} of ${FREEZE_CAP} streak freezes">${slots}</div>
+        </div>
+      </div>
+      <div class="bar ice"><i style="width:${frz >= FREEZE_CAP ? 100 : pct(ds % FREEZE_EVERY, FREEZE_EVERY)}%"></i></div>
+      <p class="sc-next">${next}</p>
+      <div class="sdays">${days}</div>
+      <p class="small sc-status">${status}</p>
+    </section>`;
   }
 
   function vToday() {
@@ -283,6 +346,7 @@
 
     return `
     ${vHero()}
+    ${vStreak()}
     <div class="datenav">
       <button class="icon-btn" data-a="day" data-v="-1" aria-label="Previous day">‹</button>
       <div class="dn-label"><b>${relative}</b><small>${label}</small></div>
@@ -459,7 +523,7 @@
       if (k > T) return '<i class="future"></i>';
       if (!r) return '<i class="l0"></i>';
       const n = (r.wMet ? 1 : 0) + (r.sMet ? 1 : 0) + (r.pMet ? 1 : 0);
-      return `<i class="l${n} ${k === T ? 'cur' : ''}" title="${k}: ${n}/3 quests"></i>`;
+      return `<i class="l${n} ${r.frozen ? 'ice' : ''} ${k === T ? 'cur' : ''}" title="${k}: ${n}/3 quests"></i>`;
     }).join('');
 
     return `
@@ -474,6 +538,8 @@
         ${tile('Lifetime steps', fmt(c.lifeSteps), `best streak ${c.best.ss}`)}
         ${tile('Water drunk', `${(c.lifeWater / 1000).toFixed(1)} L`, `best streak ${c.best.sw}`)}
         ${tile('Workouts', fmt(c.workouts), `${c.weeksDone} goal weeks`)}
+        ${tile('Daily streak', `${R.c.ds} days`, `best ${c.best.ds}`)}
+        ${tile('Streak freezes', `${R.frz} / ${FREEZE_CAP}`, `${R.frzUsed} used so far`)}
         ${tile('Protein eaten', `${(c.lifeProtein / 1000).toFixed(1)} kg`, `best streak ${c.best.spro}`)}
       </div>
     </section>
@@ -491,7 +557,7 @@
 
     <section class="card">
       <h2>Last 5 weeks</h2>
-      <p class="muted small">Darker squares mean more of water, steps and push-ups were done.</p>
+      <p class="muted small">Darker squares mean more of water, steps and push-ups were done. Blue squares are days a streak freeze covered.</p>
       <div class="heat-head">${['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(x => `<small>${x}</small>`).join('')}</div>
       <div class="heat">${cells}</div>
     </section>`;
@@ -564,6 +630,8 @@
         <li><b>Push-ups:</b> 1 XP per rep, +50 for beating the target, +100 for a new best. Beat the target and it goes up by your step size next time. Miss it twice in a row and it eases back.</li>
         <li><b>Workouts:</b> any activity, stretching included, gives 75 XP each (2 a day max). Hit your weekly goal for +250, plus +50 for each week in a row.</li>
         <li><b>Habits:</b> 15 XP each.</li>
+        <li><b>Daily streak:</b> hit any daily goal (water, protein, steps or push-ups) or log a workout to keep it going.</li>
+        <li><b>Streak freezes:</b> every ${FREEZE_EVERY} days in a row earns one (bank up to ${FREEZE_CAP}). If you miss a day, a freeze is used automatically and your streak survives. With a full bank, every ${FREEZE_EVERY}th day gives +100 XP instead.</li>
         <li><b>Perfect day:</b> water, steps and push-ups all done gives +100, plus +10 per day in a row (up to +200).</li>
         <li><b>Badges:</b> one-off XP bonuses for milestones.</li>
         <li><b>Levels</b> get steadily harder: level 2 takes 120 XP, level 10 takes about 3,800.</li>
@@ -672,6 +740,23 @@
     document.body.append(m);
   }
 
+  // Tell the player when they earn or spend a streak freeze.
+  function notifyFreezes(quiet) {
+    if (!S.seenFrz || quiet) { S.seenFrz = { e: R.frzEarned, u: R.frzUsed }; return; }
+    const earned = R.frzEarned - S.seenFrz.e, used = R.frzUsed - S.seenFrz.u;
+    if (earned > 0 && R.frz > 0) {
+      toast(`<span class="ti">🧊</span><div><small>Streak freeze earned</small><b>${R.frz} of ${FREEZE_CAP}</b> banked. Keep the fire going!</div>`, 'ice');
+      buzz([20, 40, 20]);
+    }
+    if (used > 0) {
+      const days = used === 1 ? 'a missed day' : `${used} missed days`;
+      toast(R.c.ds > 0
+        ? `<span class="ti">🧊</span><div><small>Streak saved</small>A freeze covered ${days}. Your <b>${R.c.ds}-day streak</b> lives on.</div>`
+        : `<span class="ti">🧊</span><div><small>Streak ended</small>Freezes covered ${days}, but not the whole gap. Start a new streak today!</div>`, 'ice');
+    }
+    S.seenFrz = { e: R.frzEarned, u: R.frzUsed };
+  }
+
   function commit() {
     save();
     const before = R;
@@ -687,6 +772,7 @@
         toast(`<span class="ti">${a.icon}</span><div><small>Badge unlocked</small><b>${a.name}</b> +${a.xp} XP</div>`, 'gold');
       }
     }
+    notifyFreezes();
     save();
     render();
   }
@@ -790,7 +876,7 @@
       ask('Delete all your progress, XP and badges? This cannot be undone.', 'Delete everything', () => {
         try { localStorage.removeItem(STORE); } catch (e) { /* ignore */ }
         S = defaults(); VIEW = today(); TAB = 'today';
-        R = compute(); applyTheme(); render();
+        R = compute(); notifyFreezes(true); applyTheme(); render();
       });
     },
     onboard: () => {
@@ -861,7 +947,7 @@
     if (t !== lastToday) {
       if (VIEW === lastToday) VIEW = t;
       lastToday = t;
-      R = compute(); render();
+      R = compute(); notifyFreezes(); save(); render();
     }
   };
   document.addEventListener('visibilitychange', () => { if (!document.hidden) checkDay(); });
@@ -874,4 +960,6 @@
   S.level = R.lv.level;
   applyTheme();
   render();
+  notifyFreezes(); // e.g. "a freeze saved your streak" when opening the app after a missed day
+  save();
 })();

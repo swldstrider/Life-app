@@ -14,8 +14,10 @@ It's a web app you can install to your phone's home screen. It works offline and
 | 💪 Push-ups | 1 XP per rep, +50 for beating today's target, +100 for a new best |
 | 🏋️ Workouts | Strength, cardio, HIIT, stretching, yoga, swim, sport or walk: 75 XP each (2/day max), +250 for your weekly goal, +50 per week in a row |
 | ✅ Habits | 15 XP each (customisable: sleep, veg, no junk, message a friend…) |
+| 🔥 Daily streak | Hit any daily goal or log a workout to keep it alive. Badges at 3, 7, 30, 100 and 365 days |
+| 🧊 Streak freezes | Earn one every 7 streak days (bank up to 3). A missed day uses one automatically so your streak survives. With a full bank, every 7th day gives +100 XP instead |
 | ⭐ Perfect day | Water + steps + push-ups all done: +100, +10 per day in a row (max +200) |
-| 🏅 Badges | 24 milestones with one-off XP bonuses |
+| 🏅 Badges | 30 milestones with one-off XP bonuses |
 
 **Progressive overload:** push-ups have a daily target. Beat it and the next target goes up (by 2 reps by default). Miss two sessions in a row and it eases back. The app also suggests a sets × reps split.
 
